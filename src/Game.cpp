@@ -6,15 +6,21 @@
 
 Game::Game()
     : isRunning(false), window(nullptr), glContext(nullptr),
-      playerTexture(nullptr), circleIndexCount(0) {}
+      playerTexture(nullptr), circleIndexCount(0),
+      m_Camera(nullptr), m_ScreenWidth(800), m_ScreenHeight(600) {}
 
 Game::~Game() {
+  // Clean() should be called before destructor, but just in case:
   if (playerTexture) {
     delete playerTexture;
+    playerTexture = nullptr;
   }
 }
 
 void Game::Init(const char *title, int width, int height, bool fullscreen) {
+  m_ScreenWidth = width;
+  m_ScreenHeight = height;
+  
   int flags = 0;
   if (fullscreen) {
     flags = SDL_WINDOW_FULLSCREEN;
@@ -236,13 +242,24 @@ void Game::Init(const char *title, int width, int height, bool fullscreen) {
     playerTexture = new Texture();
     playerTexture->Load("assets/char.png");
 
-    // Projection Matrix (Ortho)
-    glUseProgram(shaderProgram);
-    glm::mat4 projection = glm::ortho(0.0f, 800.0f, 600.0f, 0.0f, -1.0f, 1.0f);
-    unsigned int projLoc = glGetUniformLocation(shaderProgram, "projection");
-    glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+    // Initialize Camera
+    glm::vec2 initialCameraPos = glm::vec2(400.0f, 300.0f);
+    m_Camera = new Camera(initialCameraPos, m_ScreenWidth, m_ScreenHeight);
 
-    playerPosition = glm::vec2(400.0f, 300.0f);
+    // Create GameObjects
+    // Player object (first in vector)
+    GameObject* player = new GameObject(glm::vec2(400.0f, 300.0f), 
+                                        glm::vec2(100.0f, 100.0f), 
+                                        playerTexture);
+    m_GameObjects.push_back(player);
+
+    // Static reference object (red circle) - second in vector
+    // For the circle, we'll use a null texture and useColor=true
+    GameObject* referencePoint = new GameObject(glm::vec2(400.0f, 300.0f),
+                                                glm::vec2(50.0f, 50.0f),
+                                                nullptr);
+    m_GameObjects.push_back(referencePoint);
+
     isRunning = true;
   } else {
     std::cerr << "SDL Init failed: " << SDL_GetError() << std::endl;
@@ -266,21 +283,31 @@ void Game::Update(float deltaTime) {
   const Uint8 *state = SDL_GetKeyboardState(NULL);
   float speed = 300.0f;
 
-  if (state[SDL_SCANCODE_W]) {
-    // Move up (decrease Y)
-    playerPosition.y -= speed * deltaTime;
-  }
-  if (state[SDL_SCANCODE_S]) {
-    // Move down (increase Y)
-    playerPosition.y += speed * deltaTime;
-  }
-  if (state[SDL_SCANCODE_A]) {
-    // Move left (decrease X)
-    playerPosition.x -= speed * deltaTime;
-  }
-  if (state[SDL_SCANCODE_D]) {
-    // Move right (increase X)
-    playerPosition.x += speed * deltaTime;
+  // Update first object (player) position
+  if (m_GameObjects.size() > 0) {
+    GameObject* player = m_GameObjects[0];
+    
+    if (state[SDL_SCANCODE_W]) {
+      // Move up (decrease Y)
+      player->position.y -= speed * deltaTime;
+    }
+    if (state[SDL_SCANCODE_S]) {
+      // Move down (increase Y)
+      player->position.y += speed * deltaTime;
+    }
+    if (state[SDL_SCANCODE_A]) {
+      // Move left (decrease X)
+      player->position.x -= speed * deltaTime;
+    }
+    if (state[SDL_SCANCODE_D]) {
+      // Move right (increase X)
+      player->position.x += speed * deltaTime;
+    }
+    
+    // Camera follows player
+    if (m_Camera) {
+      m_Camera->Follow(player->position, deltaTime);
+    }
   }
 }
 
@@ -288,48 +315,46 @@ void Game::Render() {
   glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT);
 
-  // Draw Quad
-  glUseProgram(shaderProgram);
+  if (!m_Camera) {
+    return;
+  }
 
-  // View Matrix - Camera follows player (keeps player at screen center)
-  glm::mat4 view = glm::translate(glm::mat4(1.0f), 
-                                   glm::vec3(-playerPosition.x + 400.0f, 
-                                            -playerPosition.y + 300.0f, 0.0f));
-  unsigned int viewLoc = glGetUniformLocation(shaderProgram, "view");
-  glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+  // Get view and projection matrices from camera
+  glm::mat4 view = m_Camera->GetViewMatrix();
+  glm::mat4 projection = m_Camera->GetProjectionMatrix(m_ScreenWidth, m_ScreenHeight);
 
-  // Model Matrix for player - position at playerPosition in world coordinates
-  glm::mat4 model = glm::mat4(1.0f);
-  model = glm::translate(model, glm::vec3(playerPosition.x, playerPosition.y, 0.0f));
-  model = glm::scale(model, glm::vec3(100.0f, 100.0f, 1.0f));
-  unsigned int modelLoc = glGetUniformLocation(shaderProgram, "model");
-  glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-
-  playerTexture->Bind();
-  // Set useColor to false for texture rendering
-  unsigned int useColorLoc = glGetUniformLocation(shaderProgram, "useColor");
-  glUniform1i(useColorLoc, 0);
-  glBindVertexArray(VAO);
-  glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-  // Draw Static Reference Circle (Red)
-  glm::mat4 circleModel = glm::mat4(1.0f);
-  circleModel = glm::translate(circleModel, glm::vec3(400.0f, 300.0f, 0.0f));
-  circleModel = glm::scale(circleModel, glm::vec3(50.0f, 50.0f, 1.0f));
-  glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(circleModel));
-  
-  // Set color to red and useColor to true
-  unsigned int colorLoc = glGetUniformLocation(shaderProgram, "color");
-  glUniform4f(colorLoc, 1.0f, 0.0f, 0.0f, 1.0f); // Red color
-  glUniform1i(useColorLoc, 1);
-  
-  glBindVertexArray(circleVAO);
-  glDrawElements(GL_TRIANGLES, circleIndexCount, GL_UNSIGNED_INT, 0);
+  // Draw all GameObjects
+  for (size_t i = 0; i < m_GameObjects.size(); i++) {
+    GameObject* obj = m_GameObjects[i];
+    
+    if (i == 0) {
+      // Player object - use texture
+      obj->Draw(view, projection, shaderProgram, VAO, 6, false);
+    } else if (i == 1) {
+      // Reference point - use red color and circle VAO
+      obj->Draw(view, projection, shaderProgram, circleVAO, circleIndexCount, 
+                true, glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    } else {
+      // Other objects - default rendering
+      obj->Draw(view, projection, shaderProgram, VAO, 6, false);
+    }
+  }
 
   SDL_GL_SwapWindow(window);
 }
 
 void Game::Clean() {
+  // Clean up GameObjects
+  for (GameObject* obj : m_GameObjects) {
+    delete obj;
+  }
+  m_GameObjects.clear();
+
+  if (m_Camera) {
+    delete m_Camera;
+    m_Camera = nullptr;
+  }
+
   glDeleteVertexArrays(1, &VAO);
   glDeleteBuffers(1, &VBO);
   glDeleteBuffers(1, &EBO);
@@ -339,7 +364,8 @@ void Game::Clean() {
   glDeleteProgram(shaderProgram);
 
   if (playerTexture) {
-    playerTexture->Cleanup();
+    delete playerTexture;
+    playerTexture = nullptr;
   }
 
   SDL_GL_DeleteContext(glContext);

@@ -2,10 +2,13 @@
 #define GAME_H
 
 #include "Texture.h"
+#include "GameObject.h"
+#include "Camera.h"
 #include <GL/glew.h>
 #include <SDL.h>
 #include <glm/glm.hpp>
 #include <iostream>
+#include <vector>
 
 class Game {
 public:
@@ -31,7 +34,11 @@ private:
   int circleIndexCount;
 
   Texture *playerTexture;
-  glm::vec2 playerPosition;
+  std::vector<GameObject*> m_GameObjects;
+  
+  Camera* m_Camera;
+  int m_ScreenWidth;
+  int m_ScreenHeight;
 };
 
 #endif // GAME_H
