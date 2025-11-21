@@ -291,12 +291,14 @@ void Game::Render() {
   // Draw Quad
   glUseProgram(shaderProgram);
 
-  // View Matrix (Identity - no camera movement, or slight follow)
-  glm::mat4 view = glm::mat4(1.0f);
+  // View Matrix - Camera follows player (keeps player at screen center)
+  glm::mat4 view = glm::translate(glm::mat4(1.0f), 
+                                   glm::vec3(-playerPosition.x + 400.0f, 
+                                            -playerPosition.y + 300.0f, 0.0f));
   unsigned int viewLoc = glGetUniformLocation(shaderProgram, "view");
   glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
-  // Model Matrix for player - position character at playerPosition
+  // Model Matrix for player - position at playerPosition in world coordinates
   glm::mat4 model = glm::mat4(1.0f);
   model = glm::translate(model, glm::vec3(playerPosition.x, playerPosition.y, 0.0f));
   model = glm::scale(model, glm::vec3(100.0f, 100.0f, 1.0f));
