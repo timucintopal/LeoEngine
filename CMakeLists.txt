@@ -28,7 +28,7 @@ find_package(GLEW REQUIRED)
 find_package(OpenGL REQUIRED)
 
 # Add executable
-add_executable(LeoEngine src/main.cpp)
+add_executable(LeoEngine src/main.cpp src/Game.cpp)
 
 # Link Libraries
 target_link_libraries(LeoEngine PRIVATE SDL2::SDL2 GLEW::GLEW OpenGL::GL)
