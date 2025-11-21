@@ -44,7 +44,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(stb)
 
 # Add executable
-add_executable(LeoEngine src/main.cpp src/Game.cpp src/Texture.cpp src/GameObject.cpp src/Camera.cpp)
+add_executable(LeoEngine src/main.cpp src/Game.cpp src/Texture.cpp src/GameObject.cpp src/Camera.cpp src/CollisionManager.cpp)
 
 # Include directories
 target_include_directories(LeoEngine PRIVATE ${stb_SOURCE_DIR})

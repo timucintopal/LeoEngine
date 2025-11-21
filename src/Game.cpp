@@ -260,6 +260,13 @@ void Game::Init(const char *title, int width, int height, bool fullscreen) {
                                                 nullptr);
     m_GameObjects.push_back(referencePoint);
 
+    // Wall object (immobile) - third in vector
+    // This will be used for collision testing
+    GameObject* wall = new GameObject(glm::vec2(600.0f, 200.0f),
+                                      glm::vec2(150.0f, 100.0f),
+                                      nullptr);
+    m_GameObjects.push_back(wall);
+
     isRunning = true;
   } else {
     std::cerr << "SDL Init failed: " << SDL_GetError() << std::endl;
@@ -287,21 +294,62 @@ void Game::Update(float deltaTime) {
   if (m_GameObjects.size() > 0) {
     GameObject* player = m_GameObjects[0];
     
+    // Calculate next potential position
+    glm::vec2 nextPosition = player->position;
+    
     if (state[SDL_SCANCODE_W]) {
       // Move up (decrease Y)
-      player->position.y -= speed * deltaTime;
+      nextPosition.y -= speed * deltaTime;
     }
     if (state[SDL_SCANCODE_S]) {
       // Move down (increase Y)
-      player->position.y += speed * deltaTime;
+      nextPosition.y += speed * deltaTime;
     }
     if (state[SDL_SCANCODE_A]) {
       // Move left (decrease X)
-      player->position.x -= speed * deltaTime;
+      nextPosition.x -= speed * deltaTime;
     }
     if (state[SDL_SCANCODE_D]) {
       // Move right (increase X)
-      player->position.x += speed * deltaTime;
+      nextPosition.x += speed * deltaTime;
+    }
+    
+    // Check collision with potential new position
+    // Create temporary GameObject for collision check
+    GameObject tempPlayer = *player;
+    tempPlayer.position = nextPosition;
+    
+    // Check collision with all other objects (skip player itself and reference point)
+    // Reference point (index 1) is just visual, skip it in collision detection
+    bool canMoveX = true;
+    bool canMoveY = true;
+    
+    for (size_t i = 2; i < m_GameObjects.size(); i++) {
+      GameObject* other = m_GameObjects[i];
+      
+      // Check X-axis collision
+      GameObject tempX = tempPlayer;
+      tempX.position.x = nextPosition.x;
+      tempX.position.y = player->position.y; // Keep original Y
+      if (CollisionManager::CheckCollision(tempX, *other)) {
+        canMoveX = false;
+      }
+      
+      // Check Y-axis collision
+      GameObject tempY = tempPlayer;
+      tempY.position.x = player->position.x; // Keep original X
+      tempY.position.y = nextPosition.y;
+      if (CollisionManager::CheckCollision(tempY, *other)) {
+        canMoveY = false;
+      }
+    }
+    
+    // Update position only if no collision
+    if (canMoveX) {
+      player->position.x = nextPosition.x;
+    }
+    if (canMoveY) {
+      player->position.y = nextPosition.y;
     }
     
     // Camera follows player
@@ -334,6 +382,10 @@ void Game::Render() {
       // Reference point - use red color and circle VAO
       obj->Draw(view, projection, shaderProgram, circleVAO, circleIndexCount, 
                 true, glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    } else if (i == 2) {
+      // Wall object - use blue color
+      obj->Draw(view, projection, shaderProgram, VAO, 6, 
+                true, glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
     } else {
       // Other objects - default rendering
       obj->Draw(view, projection, shaderProgram, VAO, 6, false);

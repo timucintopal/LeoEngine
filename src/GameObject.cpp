@@ -44,3 +44,8 @@ void GameObject::Draw(const glm::mat4& view, const glm::mat4& projection,
   glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
 }
 
+glm::vec4 GameObject::GetBoundingBox() const {
+  // Returns (x, y, width, height)
+  return glm::vec4(position.x, position.y, size.x, size.y);
+}
+

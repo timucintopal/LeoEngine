@@ -4,6 +4,7 @@
 #include "Texture.h"
 #include "GameObject.h"
 #include "Camera.h"
+#include "CollisionManager.h"
 #include <GL/glew.h>
 #include <SDL.h>
 #include <glm/glm.hpp>
