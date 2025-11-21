@@ -1,8 +1,16 @@
 #include "Game.h"
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
-Game::Game() : isRunning(false), window(nullptr), glContext(nullptr) {}
+Game::Game()
+    : isRunning(false), window(nullptr), glContext(nullptr),
+      playerTexture(nullptr) {}
 
-Game::~Game() {}
+Game::~Game() {
+  if (playerTexture) {
+    delete playerTexture;
+  }
+}
 
 void Game::Init(const char *title, int width, int height, bool fullscreen) {
   int flags = 0;
@@ -58,16 +66,22 @@ void Game::Init(const char *title, int width, int height, bool fullscreen) {
     const char *vertexShaderSource =
         "#version 330 core\n"
         "layout (location = 0) in vec3 aPos;\n"
+        "layout (location = 1) in vec2 aTexCoord;\n"
+        "out vec2 TexCoord;\n"
+        "uniform mat4 model;\n"
         "void main()\n"
         "{\n"
-        "   gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
+        "   gl_Position = model * vec4(aPos, 1.0);\n"
+        "   TexCoord = aTexCoord;\n"
         "}\0";
     const char *fragmentShaderSource =
         "#version 330 core\n"
         "out vec4 FragColor;\n"
+        "in vec2 TexCoord;\n"
+        "uniform sampler2D tex;\n"
         "void main()\n"
         "{\n"
-        "   FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n"
+        "   FragColor = texture(tex, TexCoord);\n"
         "}\n\0";
 
     // Vertex Shader
@@ -111,37 +125,52 @@ void Game::Init(const char *title, int width, int height, bool fullscreen) {
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
 
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+
     // --- Vertex Data & Buffers ---
     float vertices[] = {
-        -0.5f, -0.5f, 0.0f, // Left
-        0.5f,  -0.5f, 0.0f, // Right
-        0.0f,  0.5f,  0.0f  // Top
+        // positions          // texture coords
+        0.5f,  0.5f,  0.0f, 1.0f, 1.0f, // top right
+        0.5f,  -0.5f, 0.0f, 1.0f, 0.0f, // bottom right
+        -0.5f, -0.5f, 0.0f, 0.0f, 0.0f, // bottom left
+        -0.5f, 0.5f,  0.0f, 0.0f, 1.0f  // top left
+    };
+    unsigned int indices[] = {
+        0, 1, 3, // first triangle
+        1, 2, 3  // second triangle
     };
 
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
-    // Bind the Vertex Array Object first, then bind and set vertex buffer(s),
-    // and then configure vertex attributes(s).
+    glGenBuffers(1, &EBO);
+
     glBindVertexArray(VAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,
+                 GL_STATIC_DRAW);
+
+    // Position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
                           (void *)0);
     glEnableVertexAttribArray(0);
 
-    // Note that this is allowed, the call to glVertexAttribPointer registered
-    // VBO as the vertex attribute's bound vertex buffer object so afterwards we
-    // can safely unbind
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    // Texture Coord attribute
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
+                          (void *)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
 
-    // You can unbind the VAO afterwards so other VAO calls won't accidentally
-    // modify this VAO, but this rarely happens. Modifying other VAOs requires a
-    // call to glBindVertexArray anyways so we generally don't unbind VAOs (nor
-    // VBOs) when it's not directly necessary.
     glBindVertexArray(0);
 
+    // Load Texture
+    playerTexture = new Texture();
+    playerTexture->Load("assets/char.png");
+
+    playerPosition = glm::vec2(0.0f, 0.0f);
     isRunning = true;
   } else {
     std::cerr << "SDL Init failed: " << SDL_GetError() << std::endl;
@@ -161,18 +190,39 @@ void Game::HandleEvents() {
   }
 }
 
-void Game::Update() {
-  // Nothing to update yet
+void Game::Update(float deltaTime) {
+  const Uint8 *state = SDL_GetKeyboardState(NULL);
+  float speed = 2.0f;
+
+  if (state[SDL_SCANCODE_W]) {
+    playerPosition.y += speed * deltaTime;
+  }
+  if (state[SDL_SCANCODE_S]) {
+    playerPosition.y -= speed * deltaTime;
+  }
+  if (state[SDL_SCANCODE_A]) {
+    playerPosition.x -= speed * deltaTime;
+  }
+  if (state[SDL_SCANCODE_D]) {
+    playerPosition.x += speed * deltaTime;
+  }
 }
 
 void Game::Render() {
-  glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+  glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT);
 
-  // Draw Triangle
+  // Draw Quad
   glUseProgram(shaderProgram);
+
+  glm::mat4 model = glm::mat4(1.0f);
+  model = glm::translate(model, glm::vec3(playerPosition, 0.0f));
+  unsigned int modelLoc = glGetUniformLocation(shaderProgram, "model");
+  glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+
+  playerTexture->Bind();
   glBindVertexArray(VAO);
-  glDrawArrays(GL_TRIANGLES, 0, 3);
+  glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
   SDL_GL_SwapWindow(window);
 }
@@ -180,7 +230,12 @@ void Game::Render() {
 void Game::Clean() {
   glDeleteVertexArrays(1, &VAO);
   glDeleteBuffers(1, &VBO);
+  glDeleteBuffers(1, &EBO);
   glDeleteProgram(shaderProgram);
+
+  if (playerTexture) {
+    playerTexture->Cleanup();
+  }
 
   SDL_GL_DeleteContext(glContext);
   SDL_DestroyWindow(window);

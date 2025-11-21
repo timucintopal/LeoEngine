@@ -1,8 +1,10 @@
 #ifndef GAME_H
 #define GAME_H
 
+#include "Texture.h"
 #include <GL/glew.h>
 #include <SDL.h>
+#include <glm/glm.hpp>
 #include <iostream>
 
 class Game {
@@ -12,7 +14,7 @@ public:
 
   void Init(const char *title, int width, int height, bool fullscreen);
   void HandleEvents();
-  void Update();
+  void Update(float deltaTime);
   void Render();
   void Clean();
 
@@ -24,7 +26,10 @@ private:
   SDL_GLContext glContext;
 
   GLuint shaderProgram;
-  GLuint VAO, VBO;
+  GLuint VAO, VBO, EBO;
+
+  Texture *playerTexture;
+  glm::vec2 playerPosition;
 };
 
 #endif // GAME_H

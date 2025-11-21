@@ -27,8 +27,27 @@ find_package(GLEW REQUIRED)
 # Find OpenGL
 find_package(OpenGL REQUIRED)
 
+# FetchContent for GLM
+FetchContent_Declare(
+  glm
+  GIT_REPOSITORY https://github.com/g-truc/glm.git
+  GIT_TAG 1.0.1
+)
+FetchContent_MakeAvailable(glm)
+
+# FetchContent for stb
+FetchContent_Declare(
+  stb
+  GIT_REPOSITORY https://github.com/nothings/stb.git
+  GIT_TAG master
+)
+FetchContent_MakeAvailable(stb)
+
 # Add executable
-add_executable(LeoEngine src/main.cpp src/Game.cpp)
+add_executable(LeoEngine src/main.cpp src/Game.cpp src/Texture.cpp)
+
+# Include directories
+target_include_directories(LeoEngine PRIVATE ${stb_SOURCE_DIR})
 
 # Link Libraries
-target_link_libraries(LeoEngine PRIVATE SDL2::SDL2 GLEW::GLEW OpenGL::GL)
+target_link_libraries(LeoEngine PRIVATE SDL2::SDL2 GLEW::GLEW OpenGL::GL glm::glm)
