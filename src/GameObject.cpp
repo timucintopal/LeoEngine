@@ -1,11 +1,18 @@
 #include "GameObject.h"
+#include "Animation.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
 GameObject::GameObject(glm::vec2 position, glm::vec2 size, Texture* texture)
-    : position(position), size(size), texture(texture) {}
+    : position(position), size(size), texture(texture), currentAnimation(nullptr) {}
 
 GameObject::~GameObject() {}
+
+void GameObject::Update(float deltaTime) {
+  if (currentAnimation) {
+    currentAnimation->Update(deltaTime);
+  }
+}
 
 void GameObject::Draw(const glm::mat4& view, const glm::mat4& projection,
                       GLuint shaderProgram, GLuint VAO, int indexCount,
@@ -35,8 +42,20 @@ void GameObject::Draw(const glm::mat4& view, const glm::mat4& projection,
   if (useColor) {
     unsigned int colorLoc = glGetUniformLocation(shaderProgram, "color");
     glUniform4f(colorLoc, color.r, color.g, color.b, color.a);
+    // Set default texture offset/scale for colored objects
+    unsigned int textureOffsetScaleLoc = glGetUniformLocation(shaderProgram, "textureOffsetScale");
+    glUniform4f(textureOffsetScaleLoc, 0.0f, 0.0f, 1.0f, 1.0f);
   } else if (texture) {
     texture->Bind();
+    
+    // Set texture offset and scale for animation
+    glm::vec4 textureOffsetScale(0.0f, 0.0f, 1.0f, 1.0f); // Default: full texture
+    if (currentAnimation) {
+      textureOffsetScale = currentAnimation->GetCurrentFrameCoords();
+    }
+    unsigned int textureOffsetScaleLoc = glGetUniformLocation(shaderProgram, "textureOffsetScale");
+    glUniform4f(textureOffsetScaleLoc, textureOffsetScale.x, textureOffsetScale.y, 
+                textureOffsetScale.z, textureOffsetScale.w);
   }
 
   // Draw

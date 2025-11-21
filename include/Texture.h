@@ -12,6 +12,9 @@ public:
   void Bind();
   void Unbind();
   void Cleanup();
+  
+  int GetWidth() const { return width; }
+  int GetHeight() const { return height; }
 
 private:
   GLuint ID;
