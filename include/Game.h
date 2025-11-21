@@ -27,6 +27,8 @@ private:
 
   GLuint shaderProgram;
   GLuint VAO, VBO, EBO;
+  GLuint circleVAO, circleVBO, circleEBO;
+  int circleIndexCount;
 
   Texture *playerTexture;
   glm::vec2 playerPosition;

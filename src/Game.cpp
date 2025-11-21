@@ -1,10 +1,12 @@
 #include "Game.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <vector>
+#include <cmath>
 
 Game::Game()
     : isRunning(false), window(nullptr), glContext(nullptr),
-      playerTexture(nullptr) {}
+      playerTexture(nullptr), circleIndexCount(0) {}
 
 Game::~Game() {
   if (playerTexture) {
@@ -69,9 +71,11 @@ void Game::Init(const char *title, int width, int height, bool fullscreen) {
         "layout (location = 1) in vec2 aTexCoord;\n"
         "out vec2 TexCoord;\n"
         "uniform mat4 model;\n"
+        "uniform mat4 view;\n"
+        "uniform mat4 projection;\n"
         "void main()\n"
         "{\n"
-        "   gl_Position = model * vec4(aPos, 1.0);\n"
+        "   gl_Position = projection * view * model * vec4(aPos, 1.0);\n"
         "   TexCoord = aTexCoord;\n"
         "}\0";
     const char *fragmentShaderSource =
@@ -79,9 +83,15 @@ void Game::Init(const char *title, int width, int height, bool fullscreen) {
         "out vec4 FragColor;\n"
         "in vec2 TexCoord;\n"
         "uniform sampler2D tex;\n"
+        "uniform vec4 color;\n"
+        "uniform bool useColor;\n"
         "void main()\n"
         "{\n"
-        "   FragColor = texture(tex, TexCoord);\n"
+        "   if (useColor) {\n"
+        "       FragColor = color;\n"
+        "   } else {\n"
+        "       FragColor = texture(tex, TexCoord);\n"
+        "   }\n"
         "}\n\0";
 
     // Vertex Shader
@@ -125,9 +135,6 @@ void Game::Init(const char *title, int width, int height, bool fullscreen) {
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
 
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-
     // --- Vertex Data & Buffers ---
     float vertices[] = {
         // positions          // texture coords
@@ -166,11 +173,76 @@ void Game::Init(const char *title, int width, int height, bool fullscreen) {
 
     glBindVertexArray(0);
 
+    // --- Circle Vertex Data & Buffers (for reference point) ---
+    const int circleSegments = 32;
+    std::vector<float> circleVertices;
+    std::vector<unsigned int> circleIndices;
+    
+    // Center vertex
+    circleVertices.push_back(0.0f); // x
+    circleVertices.push_back(0.0f); // y
+    circleVertices.push_back(0.0f); // z
+    circleVertices.push_back(0.5f); // tex x
+    circleVertices.push_back(0.5f); // tex y
+    
+    // Circle vertices
+    for (int i = 0; i <= circleSegments; i++) {
+      float angle = 2.0f * 3.14159265359f * i / circleSegments;
+      float x = cosf(angle);
+      float y = sinf(angle);
+      circleVertices.push_back(x);  // x
+      circleVertices.push_back(y);  // y
+      circleVertices.push_back(0.0f); // z
+      circleVertices.push_back(x * 0.5f + 0.5f); // tex x
+      circleVertices.push_back(y * 0.5f + 0.5f); // tex y
+    }
+    
+    // Circle indices (triangles from center)
+    for (int i = 0; i < circleSegments; i++) {
+      circleIndices.push_back(0); // center
+      circleIndices.push_back(i + 1);
+      circleIndices.push_back(i + 2);
+    }
+    circleIndexCount = circleIndices.size();
+    
+    glGenVertexArrays(1, &circleVAO);
+    glGenBuffers(1, &circleVBO);
+    glGenBuffers(1, &circleEBO);
+    
+    glBindVertexArray(circleVAO);
+    
+    glBindBuffer(GL_ARRAY_BUFFER, circleVBO);
+    glBufferData(GL_ARRAY_BUFFER, circleVertices.size() * sizeof(float),
+                 circleVertices.data(), GL_STATIC_DRAW);
+    
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, circleEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                 circleIndices.size() * sizeof(unsigned int),
+                 circleIndices.data(), GL_STATIC_DRAW);
+    
+    // Position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
+                          (void *)0);
+    glEnableVertexAttribArray(0);
+    
+    // Texture Coord attribute
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
+                          (void *)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    
+    glBindVertexArray(0);
+
     // Load Texture
     playerTexture = new Texture();
     playerTexture->Load("assets/char.png");
 
-    playerPosition = glm::vec2(0.0f, 0.0f);
+    // Projection Matrix (Ortho)
+    glUseProgram(shaderProgram);
+    glm::mat4 projection = glm::ortho(0.0f, 800.0f, 600.0f, 0.0f, -1.0f, 1.0f);
+    unsigned int projLoc = glGetUniformLocation(shaderProgram, "projection");
+    glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+
+    playerPosition = glm::vec2(400.0f, 300.0f);
     isRunning = true;
   } else {
     std::cerr << "SDL Init failed: " << SDL_GetError() << std::endl;
@@ -192,18 +264,22 @@ void Game::HandleEvents() {
 
 void Game::Update(float deltaTime) {
   const Uint8 *state = SDL_GetKeyboardState(NULL);
-  float speed = 2.0f;
+  float speed = 300.0f;
 
   if (state[SDL_SCANCODE_W]) {
-    playerPosition.y += speed * deltaTime;
-  }
-  if (state[SDL_SCANCODE_S]) {
+    // Move up (decrease Y)
     playerPosition.y -= speed * deltaTime;
   }
+  if (state[SDL_SCANCODE_S]) {
+    // Move down (increase Y)
+    playerPosition.y += speed * deltaTime;
+  }
   if (state[SDL_SCANCODE_A]) {
+    // Move left (decrease X)
     playerPosition.x -= speed * deltaTime;
   }
   if (state[SDL_SCANCODE_D]) {
+    // Move right (increase X)
     playerPosition.x += speed * deltaTime;
   }
 }
@@ -215,14 +291,38 @@ void Game::Render() {
   // Draw Quad
   glUseProgram(shaderProgram);
 
+  // View Matrix (Identity - no camera movement, or slight follow)
+  glm::mat4 view = glm::mat4(1.0f);
+  unsigned int viewLoc = glGetUniformLocation(shaderProgram, "view");
+  glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+
+  // Model Matrix for player - position character at playerPosition
   glm::mat4 model = glm::mat4(1.0f);
-  model = glm::translate(model, glm::vec3(playerPosition, 0.0f));
+  model = glm::translate(model, glm::vec3(playerPosition.x, playerPosition.y, 0.0f));
+  model = glm::scale(model, glm::vec3(100.0f, 100.0f, 1.0f));
   unsigned int modelLoc = glGetUniformLocation(shaderProgram, "model");
   glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 
   playerTexture->Bind();
+  // Set useColor to false for texture rendering
+  unsigned int useColorLoc = glGetUniformLocation(shaderProgram, "useColor");
+  glUniform1i(useColorLoc, 0);
   glBindVertexArray(VAO);
   glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+  // Draw Static Reference Circle (Red)
+  glm::mat4 circleModel = glm::mat4(1.0f);
+  circleModel = glm::translate(circleModel, glm::vec3(400.0f, 300.0f, 0.0f));
+  circleModel = glm::scale(circleModel, glm::vec3(50.0f, 50.0f, 1.0f));
+  glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(circleModel));
+  
+  // Set color to red and useColor to true
+  unsigned int colorLoc = glGetUniformLocation(shaderProgram, "color");
+  glUniform4f(colorLoc, 1.0f, 0.0f, 0.0f, 1.0f); // Red color
+  glUniform1i(useColorLoc, 1);
+  
+  glBindVertexArray(circleVAO);
+  glDrawElements(GL_TRIANGLES, circleIndexCount, GL_UNSIGNED_INT, 0);
 
   SDL_GL_SwapWindow(window);
 }
@@ -231,6 +331,9 @@ void Game::Clean() {
   glDeleteVertexArrays(1, &VAO);
   glDeleteBuffers(1, &VBO);
   glDeleteBuffers(1, &EBO);
+  glDeleteVertexArrays(1, &circleVAO);
+  glDeleteBuffers(1, &circleVBO);
+  glDeleteBuffers(1, &circleEBO);
   glDeleteProgram(shaderProgram);
 
   if (playerTexture) {
