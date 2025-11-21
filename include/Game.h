@@ -44,6 +44,8 @@ private:
   
   Mix_Music* m_BackgroundMusic;
   Mix_Chunk* m_JumpSound;
+  Mix_Chunk* m_CollisionSound;
+  bool m_WasColliding;
 };
 
 #endif // GAME_H

@@ -8,7 +8,8 @@ Game::Game()
     : isRunning(false), window(nullptr), glContext(nullptr),
       playerTexture(nullptr), circleIndexCount(0),
       m_Camera(nullptr), m_ScreenWidth(800), m_ScreenHeight(600),
-      m_BackgroundMusic(nullptr), m_JumpSound(nullptr) {}
+      m_BackgroundMusic(nullptr), m_JumpSound(nullptr), 
+      m_CollisionSound(nullptr), m_WasColliding(false) {}
 
 Game::~Game() {
   // Clean() should be called before destructor, but just in case:
@@ -296,6 +297,14 @@ void Game::Init(const char *title, int width, int height, bool fullscreen) {
       std::cout << "Jump sound loaded!" << std::endl;
     }
 
+    // Load collision sound effect
+    m_CollisionSound = Mix_LoadWAV("assets/Audio/collision.wav");
+    if (m_CollisionSound == nullptr) {
+      std::cerr << "Failed to load collision sound! SDL_mixer Error: " << Mix_GetError() << std::endl;
+    } else {
+      std::cout << "Collision sound loaded!" << std::endl;
+    }
+
     isRunning = true;
   } else {
     std::cerr << "SDL Init failed: " << SDL_GetError() << std::endl;
@@ -361,6 +370,7 @@ void Game::Update(float deltaTime) {
     // Reference point (index 1) is just visual, skip it in collision detection
     bool canMoveX = true;
     bool canMoveY = true;
+    bool isColliding = false;
     
     for (size_t i = 2; i < m_GameObjects.size(); i++) {
       GameObject* other = m_GameObjects[i];
@@ -371,6 +381,7 @@ void Game::Update(float deltaTime) {
       tempX.position.y = player->position.y; // Keep original Y
       if (CollisionManager::CheckCollision(tempX, *other)) {
         canMoveX = false;
+        isColliding = true;
       }
       
       // Check Y-axis collision
@@ -379,8 +390,15 @@ void Game::Update(float deltaTime) {
       tempY.position.y = nextPosition.y;
       if (CollisionManager::CheckCollision(tempY, *other)) {
         canMoveY = false;
+        isColliding = true;
       }
     }
+    
+    // Play collision sound if collision just started (wasn't colliding before)
+    if (isColliding && !m_WasColliding && m_CollisionSound != nullptr) {
+      Mix_PlayChannel(-1, m_CollisionSound, 0);
+    }
+    m_WasColliding = isColliding;
     
     // Update position only if no collision
     if (canMoveX) {
@@ -464,6 +482,11 @@ void Game::Clean() {
     m_JumpSound = nullptr;
   }
   
+  if (m_CollisionSound != nullptr) {
+    Mix_FreeChunk(m_CollisionSound);
+    m_CollisionSound = nullptr;
+  }
+  
   if (m_BackgroundMusic != nullptr) {
     Mix_FreeMusic(m_BackgroundMusic);
     m_BackgroundMusic = nullptr;
@@ -477,3 +500,4 @@ void Game::Clean() {
   SDL_Quit();
   std::cout << "Game Cleaned" << std::endl;
 }
+
