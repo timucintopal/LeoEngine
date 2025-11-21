@@ -21,6 +21,26 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(SDL2)
 
+# Try to find SDL2_mixer system package first
+find_package(SDL2_mixer QUIET)
+if(NOT SDL2_mixer_FOUND)
+  message(STATUS "SDL2_mixer not found, attempting to build from source...")
+  # FetchContent for SDL2_mixer
+  FetchContent_Declare(
+    SDL2_mixer
+    GIT_REPOSITORY https://github.com/libsdl-org/SDL_mixer.git
+    GIT_TAG release-2.8.0
+  )
+  # Disable optional dependencies to avoid build issues
+  set(SDL2_MIXER_OPUS OFF CACHE BOOL "" FORCE)
+  set(SDL2_MIXER_OPUSFILE OFF CACHE BOOL "" FORCE)
+  set(SDL2_MIXER_FLAC OFF CACHE BOOL "" FORCE)
+  set(SDL2_MIXER_MOD OFF CACHE BOOL "" FORCE)
+  set(SDL2_MIXER_MIDI OFF CACHE BOOL "" FORCE)
+  set(SDL2_MIXER_MP3_MPG123 OFF CACHE BOOL "" FORCE)
+  FetchContent_MakeAvailable(SDL2_mixer)
+endif()
+
 # Find GLEW
 find_package(GLEW REQUIRED)
 
@@ -50,4 +70,4 @@ add_executable(LeoEngine src/main.cpp src/Game.cpp src/Texture.cpp src/GameObjec
 target_include_directories(LeoEngine PRIVATE ${stb_SOURCE_DIR})
 
 # Link Libraries
-target_link_libraries(LeoEngine PRIVATE SDL2::SDL2 GLEW::GLEW OpenGL::GL glm::glm)
+target_link_libraries(LeoEngine PRIVATE SDL2::SDL2 SDL2_mixer::SDL2_mixer GLEW::GLEW OpenGL::GL glm::glm)

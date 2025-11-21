@@ -7,6 +7,7 @@
 #include "CollisionManager.h"
 #include <GL/glew.h>
 #include <SDL.h>
+#include <SDL_mixer.h>
 #include <glm/glm.hpp>
 #include <iostream>
 #include <vector>
@@ -40,6 +41,9 @@ private:
   Camera* m_Camera;
   int m_ScreenWidth;
   int m_ScreenHeight;
+  
+  Mix_Music* m_BackgroundMusic;
+  Mix_Chunk* m_JumpSound;
 };
 
 #endif // GAME_H

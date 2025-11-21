@@ -7,7 +7,8 @@
 Game::Game()
     : isRunning(false), window(nullptr), glContext(nullptr),
       playerTexture(nullptr), circleIndexCount(0),
-      m_Camera(nullptr), m_ScreenWidth(800), m_ScreenHeight(600) {}
+      m_Camera(nullptr), m_ScreenWidth(800), m_ScreenHeight(600),
+      m_BackgroundMusic(nullptr), m_JumpSound(nullptr) {}
 
 Game::~Game() {
   // Clean() should be called before destructor, but just in case:
@@ -26,8 +27,15 @@ void Game::Init(const char *title, int width, int height, bool fullscreen) {
     flags = SDL_WINDOW_FULLSCREEN;
   }
 
-  if (SDL_Init(SDL_INIT_VIDEO) == 0) {
+  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) == 0) {
     std::cout << "Subsystems Initialized!..." << std::endl;
+    
+    // Initialize SDL_mixer
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+      std::cerr << "SDL_mixer could not initialize! SDL_mixer Error: " << Mix_GetError() << std::endl;
+    } else {
+      std::cout << "SDL_mixer initialized!" << std::endl;
+    }
 
     // Configure OpenGL Attributes
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
@@ -267,6 +275,27 @@ void Game::Init(const char *title, int width, int height, bool fullscreen) {
                                       nullptr);
     m_GameObjects.push_back(wall);
 
+    // Load background music
+    m_BackgroundMusic = Mix_LoadMUS("assets/background.ogg");
+    if (m_BackgroundMusic == nullptr) {
+      std::cerr << "Failed to load background music! SDL_mixer Error: " << Mix_GetError() << std::endl;
+    } else {
+      // Play background music looping
+      if (Mix_PlayMusic(m_BackgroundMusic, -1) == -1) {
+        std::cerr << "Failed to play background music! SDL_mixer Error: " << Mix_GetError() << std::endl;
+      } else {
+        std::cout << "Background music playing!" << std::endl;
+      }
+    }
+
+    // Load jump sound effect
+    m_JumpSound = Mix_LoadWAV("assets/jump.wav");
+    if (m_JumpSound == nullptr) {
+      std::cerr << "Failed to load jump sound! SDL_mixer Error: " << Mix_GetError() << std::endl;
+    } else {
+      std::cout << "Jump sound loaded!" << std::endl;
+    }
+
     isRunning = true;
   } else {
     std::cerr << "SDL Init failed: " << SDL_GetError() << std::endl;
@@ -276,13 +305,22 @@ void Game::Init(const char *title, int width, int height, bool fullscreen) {
 
 void Game::HandleEvents() {
   SDL_Event event;
-  SDL_PollEvent(&event);
-  switch (event.type) {
-  case SDL_QUIT:
-    isRunning = false;
-    break;
-  default:
-    break;
+  while (SDL_PollEvent(&event)) {
+    switch (event.type) {
+    case SDL_QUIT:
+      isRunning = false;
+      break;
+    case SDL_KEYDOWN:
+      if (event.key.keysym.sym == SDLK_w) {
+        // Play jump sound effect
+        if (m_JumpSound != nullptr) {
+          Mix_PlayChannel(-1, m_JumpSound, 0);
+        }
+      }
+      break;
+    default:
+      break;
+    }
   }
 }
 
@@ -419,6 +457,20 @@ void Game::Clean() {
     delete playerTexture;
     playerTexture = nullptr;
   }
+
+  // Free sound effects and music
+  if (m_JumpSound != nullptr) {
+    Mix_FreeChunk(m_JumpSound);
+    m_JumpSound = nullptr;
+  }
+  
+  if (m_BackgroundMusic != nullptr) {
+    Mix_FreeMusic(m_BackgroundMusic);
+    m_BackgroundMusic = nullptr;
+  }
+  
+  // Quit SDL_mixer
+  Mix_CloseAudio();
 
   SDL_GL_DeleteContext(glContext);
   SDL_DestroyWindow(window);
