@@ -21,11 +21,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(SDL2)
 
+# Find GLEW
+find_package(GLEW REQUIRED)
+
+# Find OpenGL
+find_package(OpenGL REQUIRED)
+
 # Add executable
 add_executable(LeoEngine src/main.cpp)
 
-# Link SDL2
-# SDL2::SDL2-static is often safer for simple static linking via FetchContent, 
-# but SDL2::SDL2 is also common depending on how it's built. 
-# Let's stick to SDL2::SDL2 which usually aliases the correct one.
-target_link_libraries(LeoEngine PRIVATE SDL2::SDL2)
+# Link Libraries
+target_link_libraries(LeoEngine PRIVATE SDL2::SDL2 GLEW::GLEW OpenGL::GL)
