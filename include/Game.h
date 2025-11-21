@@ -5,9 +5,11 @@
 #include "GameObject.h"
 #include "Camera.h"
 #include "CollisionManager.h"
+#include "TextRenderer.h"
 #include <GL/glew.h>
 #include <SDL.h>
 #include <SDL_mixer.h>
+#include <SDL_ttf.h>
 #include <glm/glm.hpp>
 #include <iostream>
 #include <vector>
@@ -46,6 +48,8 @@ private:
   Mix_Chunk* m_JumpSound;
   Mix_Chunk* m_CollisionSound;
   bool m_WasColliding;
+  
+  TextRenderer* m_TextRenderer;
 };
 
 #endif // GAME_H

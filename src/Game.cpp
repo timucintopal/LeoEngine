@@ -9,7 +9,8 @@ Game::Game()
       playerTexture(nullptr), circleIndexCount(0),
       m_Camera(nullptr), m_ScreenWidth(800), m_ScreenHeight(600),
       m_BackgroundMusic(nullptr), m_JumpSound(nullptr), 
-      m_CollisionSound(nullptr), m_WasColliding(false) {}
+      m_CollisionSound(nullptr), m_WasColliding(false),
+      m_TextRenderer(nullptr) {}
 
 Game::~Game() {
   // Clean() should be called before destructor, but just in case:
@@ -36,6 +37,13 @@ void Game::Init(const char *title, int width, int height, bool fullscreen) {
       std::cerr << "SDL_mixer could not initialize! SDL_mixer Error: " << Mix_GetError() << std::endl;
     } else {
       std::cout << "SDL_mixer initialized!" << std::endl;
+    }
+    
+    // Initialize SDL_ttf
+    if (TTF_Init() == -1) {
+      std::cerr << "SDL_ttf could not initialize! SDL_ttf Error: " << TTF_GetError() << std::endl;
+    } else {
+      std::cout << "SDL_ttf initialized!" << std::endl;
     }
 
     // Configure OpenGL Attributes
@@ -305,6 +313,12 @@ void Game::Init(const char *title, int width, int height, bool fullscreen) {
       std::cout << "Collision sound loaded!" << std::endl;
     }
 
+    // Initialize TextRenderer
+    m_TextRenderer = new TextRenderer();
+    if (!m_TextRenderer->LoadFont("assets/Font/Roboto-Bold.ttf", 24)) {
+      std::cerr << "Failed to load font for text rendering!" << std::endl;
+    }
+
     isRunning = true;
   } else {
     std::cerr << "SDL Init failed: " << SDL_GetError() << std::endl;
@@ -448,6 +462,12 @@ void Game::Render() {
     }
   }
 
+  // Render text in screen space (UI elements)
+  if (m_TextRenderer) {
+    m_TextRenderer->RenderText("SCORE: 100", 100, 20, shaderProgram, VAO, 
+                               m_ScreenWidth, m_ScreenHeight);
+  }
+
   SDL_GL_SwapWindow(window);
 }
 
@@ -492,8 +512,18 @@ void Game::Clean() {
     m_BackgroundMusic = nullptr;
   }
   
+  // Cleanup TextRenderer
+  if (m_TextRenderer) {
+    m_TextRenderer->Cleanup();
+    delete m_TextRenderer;
+    m_TextRenderer = nullptr;
+  }
+
   // Quit SDL_mixer
   Mix_CloseAudio();
+
+  // Quit SDL_ttf
+  TTF_Quit();
 
   SDL_GL_DeleteContext(glContext);
   SDL_DestroyWindow(window);

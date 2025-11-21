@@ -41,6 +41,19 @@ if(NOT SDL2_mixer_FOUND)
   FetchContent_MakeAvailable(SDL2_mixer)
 endif()
 
+# Try to find SDL2_ttf system package first
+find_package(SDL2_ttf QUIET)
+if(NOT SDL2_ttf_FOUND)
+  message(STATUS "SDL2_ttf not found, attempting to build from source...")
+  # FetchContent for SDL2_ttf
+  FetchContent_Declare(
+    SDL2_ttf
+    GIT_REPOSITORY https://github.com/libsdl-org/SDL_ttf.git
+    GIT_TAG release-2.22.0
+  )
+  FetchContent_MakeAvailable(SDL2_ttf)
+endif()
+
 # Find GLEW
 find_package(GLEW REQUIRED)
 
@@ -64,10 +77,10 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(stb)
 
 # Add executable
-add_executable(LeoEngine src/main.cpp src/Game.cpp src/Texture.cpp src/GameObject.cpp src/Camera.cpp src/CollisionManager.cpp)
+add_executable(LeoEngine src/main.cpp src/Game.cpp src/Texture.cpp src/GameObject.cpp src/Camera.cpp src/CollisionManager.cpp src/TextRenderer.cpp)
 
 # Include directories
 target_include_directories(LeoEngine PRIVATE ${stb_SOURCE_DIR})
 
 # Link Libraries
-target_link_libraries(LeoEngine PRIVATE SDL2::SDL2 SDL2_mixer::SDL2_mixer GLEW::GLEW OpenGL::GL glm::glm)
+target_link_libraries(LeoEngine PRIVATE SDL2::SDL2 SDL2_mixer::SDL2_mixer SDL2_ttf::SDL2_ttf GLEW::GLEW OpenGL::GL glm::glm)
